@@ -1,0 +1,134 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from io import StringIO
+
+# --- Data Loading and Cleaning Functions ---
+
+def load_and_clean_data(csv_file_path=None):
+    """
+    Loads the COVID-19 metadata, handles missing values, and preprocesses columns.
+    
+    NOTE: In a real environment, replace the simulation section with:
+    df = pd.read_csv(csv_file_path, low_memory=False, parse_dates=['publish_time'])
+    """
+    if csv_file_path is None:
+        # --- DATA SIMULATION (to make the code runnable without the real file) ---
+        print("SIMULATING DATA: Please replace this with pd.read_csv(csv_file_path) for the real dataset.")
+        data = """
+        sha,title,abstract,publish_time,journal,source_x
+        a1,"Paper Title 1","Abstract for first paper.","2020-03-01","NEJM","PMC"
+        a2,"Second Study","Analysis of spread.","2020-03-15","The Lancet","PMC"
+        a3,"Vaccine Efficacy","Early results of tests.","2020-04-10","JAMA","Elsevier"
+        a4,"Mask Usage","Modeling efficacy.","2020-04-25","NEJM","PMC"
+        a5,"Testing Frequency","Testing is key.","2020-05-01","Science","Elsevier"
+        a6,"Global Spread",,,"2020-02-01","JAMA","PMC"
+        a7,"Clinical Trials","Data for new drug.","2020-04-01",,"Elsevier"
+        a8,"Policy Impacts","Economic effects.","2020-05-01","Nature","Elsevier"
+        a9,"Viral Mutations","New strains detected.","2020-03-20","Science","PMC"
+        a10,"Public Health","Survey data.","2020-05-15","NEJM","PMC"
+        """
+        df = pd.read_csv(StringIO(data))
+        df['publish_time'] = pd.to_datetime(df['publish_time'], errors='coerce')
+        # ------------------------------------------------------------------------
+    else:
+        # Use this line for the actual assignment submission:
+        df = pd.read_csv(csv_file_path, low_memory=False, parse_dates=['publish_time'])
+        
+    print("\n--- Task 1: Dataset Exploration and Cleaning ---")
+    
+    # Exploration
+    print("\nFirst 5 rows:")
+    print(df.head())
+    print("\nData Info (before cleaning):")
+    df.info()
+
+    # Cleaning: Drop rows where essential columns are missing
+    # We require a title and a publication date for most analysis.
+    df.dropna(subset=['title', 'publish_time'], inplace=True)
+
+    # Cleaning: Fill missing categorical values with 'Unknown'
+    df['abstract'].fillna('[No Abstract Provided]', inplace=True)
+    df['journal'].fillna('Unknown Journal', inplace=True)
+    df['source_x'].fillna('Unknown Source', inplace=True)
+
+    # Filtering data for relevant date range (assuming CORD-19 data is recent)
+    df = df[df['publish_time'].dt.year >= 2020]
+    
+    print("\nMissing Values after cleaning:")
+    print(df.isnull().sum())
+    print(f"Final dataset size after cleaning: {len(df)} rows")
+    
+    # Add a year/month column for time-series analysis
+    df['publication_month'] = df['publish_time'].dt.to_period('M')
+
+    return df
+
+# --- Task 2 & 3: Analysis and Visualization Functions ---
+
+def analyze_publications_over_time(df):
+    """Generates data for Line Chart: publication trend."""
+    # Group by publication month and count papers
+    time_series = df.groupby('publication_month').size().reset_index(name='Paper Count')
+    time_series['publication_month'] = time_series['publication_month'].astype(str)
+    return time_series
+
+def analyze_top_journals(df, n=10):
+    """Generates data for Bar Chart: top contributing journals."""
+    # Count the number of papers per journal
+    top_journals = df['journal'].value_counts().nlargest(n).reset_index(name='Paper Count')
+    top_journals.columns = ['Journal', 'Paper Count']
+    return top_journals
+
+def visualize_analysis(df):
+    """Creates a 2x2 grid of visualizations."""
+    
+    time_series_data = analyze_publications_over_time(df)
+    top_journals_data = analyze_top_journals(df, n=5)
+    
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    sns.set_style("whitegrid")
+    
+    # 1. Line Chart: Publications Over Time
+    axes[0, 0].plot(time_series_data['publication_month'], 
+                    time_series_data['Paper Count'], 
+                    marker='o', linestyle='-', color='#0072B2')
+    axes[0, 0].set_title('Trend: CORD-19 Publications Over Time', fontsize=14)
+    axes[0, 0].set_xlabel('Publication Month')
+    axes[0, 0].set_ylabel('Number of Papers')
+    axes[0, 0].tick_params(axis='x', rotation=45)
+    
+    # 2. Bar Chart: Top 5 Contributing Journals
+    sns.barplot(x='Paper Count', y='Journal', data=top_journals_data, palette='viridis', ax=axes[0, 1])
+    axes[0, 1].set_title('Top 5 Contributing Journals', fontsize=14)
+    axes[0, 1].set_xlabel('Number of Papers')
+    axes[0, 1].set_ylabel('Journal Name')
+
+    # 3. Histogram: Distribution of Title Lengths (simulated feature)
+    df['title_length'] = df['title'].apply(len)
+    sns.histplot(df['title_length'], bins=5, kde=True, color='#D55E00', ax=axes[1, 0])
+    axes[1, 0].set_title('Distribution of Title Lengths', fontsize=14)
+    axes[1, 0].set_xlabel('Title Length (Characters)')
+    axes[1, 0].set_ylabel('Frequency')
+    
+    # 4. Scatter Plot: Abstract Length vs. Title Length (simulated feature)
+    df['abstract_length'] = df['abstract'].apply(len)
+    sns.scatterplot(x='title_length', y='abstract_length', data=df, color='#CC79A7', ax=axes[1, 1])
+    axes[1, 1].set_title('Title Length vs. Abstract Length', fontsize=14)
+    axes[1, 1].set_xlabel('Title Length')
+    axes[1, 1].set_ylabel('Abstract Length')
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+if __name__ == '__main__':
+    # Run the full analysis and visualization
+    df = load_and_clean_data(csv_file_path=None) 
+    
+    # Display basic analysis result
+    print("\n--- Task 2: Mean Title Length ---")
+    print(f"Average Title Length (Characters): {df['title'].apply(len).mean():.2f}")
+    
+    # Display visualization
+    visualize_analysis(df)
